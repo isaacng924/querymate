@@ -56,6 +56,25 @@ _SQL_FORMAT = {
     },
 }
 
+_PLAN_FORMAT = {
+    "type": "json_schema",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "tables": {"type": "array", "items": {"type": "string"},
+                       "description": "Tables the query needs."},
+            "join_count": {"type": "integer",
+                           "description": "Number of JOINs expected."},
+            "aggregations": {"type": "array", "items": {"type": "string"},
+                             "description": "Aggregate functions needed (COUNT, SUM...)."},
+            "filters": {"type": "array", "items": {"type": "string"},
+                        "description": "WHERE/HAVING conditions in plain words."},
+        },
+        "required": ["tables", "join_count", "aggregations", "filters"],
+        "additionalProperties": False,
+    },
+}
+
 
 def _system(schema: str, dialect: str) -> str:
     return (
@@ -153,3 +172,44 @@ def diagnose(
     )
     entry = _usage_entry(resp, model, t0, purpose="critic")
     return next((b.text for b in resp.content if b.type == "text"), error), entry
+
+
+def plan(
+    *,
+    question: str,
+    schema: str,
+    dialect: str,
+    model: str,
+    evidence: Optional[str] = None,
+    max_tokens: int = 500,
+) -> tuple[Optional[dict], Optional[dict]]:
+    """Advisory query plan. Returns (plan_info, usage_entry); (None, entry-or-None)
+    on any failure — the loop must never depend on the planner."""
+    parts = [f"Question: {question}"]
+    if evidence:
+        parts.append(f"Hint (domain evidence): {evidence}")
+    parts.append(
+        "Plan the SQL query: which tables, how many joins, which aggregate "
+        "functions, which filters. Do not write SQL."
+    )
+    t0 = time.monotonic()
+    try:
+        resp = client().messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=[{
+                "type": "text",
+                "text": _system(schema, dialect),
+                "cache_control": {"type": "ephemeral"},
+            }],
+            messages=[{"role": "user", "content": "\n".join(parts)}],
+            output_config={"format": _PLAN_FORMAT},
+        )
+        entry = _usage_entry(resp, model, t0, purpose="planner")
+        text = next((b.text for b in resp.content if b.type == "text"), "{}")
+        info = json.loads(text)
+        if not isinstance(info, dict) or "tables" not in info:
+            return None, entry
+        return info, entry
+    except Exception:
+        return None, None
