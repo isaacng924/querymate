@@ -97,6 +97,7 @@ def write_sql(
     dialect: str,
     model: str,
     evidence: Optional[str] = None,
+    plan: Optional[str] = None,
     repair_hint: Optional[str] = None,
     prev_sql: Optional[str] = None,
     max_tokens: int = 1500,
@@ -113,6 +114,8 @@ def write_sql(
     parts = [f"Question: {question}"]
     if evidence:
         parts.append(f"Hint (domain evidence): {evidence}")
+    if plan:
+        parts.append(f"Query plan (advisory):\n{plan}")
     if prev_sql:
         parts.append(f"\nYour previous query was:\n{prev_sql}")
     if repair_hint:

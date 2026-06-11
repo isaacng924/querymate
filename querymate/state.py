@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Optional, TypedDict
+import operator
+from typing import Annotated, Any, Optional, TypedDict
 
 
 class DBError(TypedDict):
@@ -12,14 +13,28 @@ class DBError(TypedDict):
 class QueryState(TypedDict, total=False):
     """State carried through the LangGraph loop.
 
-    Phase 0 uses a flat ``schema`` string (the demo DB's CREATE statements).
-    Phase 1 replaces it with retrieved schema cards (RAG).
+    Phase 1: ``schema`` is built from retrieved schema cards (RAG arm) or the
+    full DDL (full-schema arm / fallback) — the writer sees one string either way.
     """
 
     question: str
+    evidence: Optional[str]       # BIRD domain hint, when the dataset provides one
     schema: str
     dialect: str
     db_path: str
+    db_id: str                    # index partition key (defaults to db filename stem)
+
+    # retrieval (Phase 1)
+    use_retrieval: bool
+    retrieval_k: int
+    retrieval_widened: bool       # widen happened at some point (bounds it to once)
+    widen_now: bool               # critic verdict for the router edge this turn
+    card_tables: list[str]        # tables whose cards the writer saw
+
+    # planner (Phase 1)
+    use_planner: bool
+    plan: Optional[str]           # rendered plan text for the writer prompt
+    plan_info: Optional[dict]     # structured plan for the model router
 
     sql: Optional[str]            # last query the writer produced
     validated_sql: Optional[str]  # post-validation (LIMIT-injected) query that ran
@@ -30,6 +45,9 @@ class QueryState(TypedDict, total=False):
 
     rows: Optional[list[tuple[Any, ...]]]
     columns: Optional[list[str]]
+
+    # cost accounting: nodes return {"cost_log": [entry]} and entries accumulate
+    cost_log: Annotated[list[dict], operator.add]
 
     # knobs
     auto_limit: bool
