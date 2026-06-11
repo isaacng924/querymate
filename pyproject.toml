@@ -1,0 +1,25 @@
+[project]
+name = "querymate"
+version = "0.0.1"
+description = "Multi-agent NL→SQL analytics copilot (Phase 0): writer→executor→critic loop + execution-accuracy eval."
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=0.49",
+    "langgraph>=0.2.50",
+    "sqlglot>=25.0",
+    "pydantic-settings>=2.0",
+]
+
+[project.optional-dependencies]
+# Phase 3 observability. Install with: uv sync --extra trace
+trace = ["langfuse>=2.0"]
+
+[project.scripts]
+querymate = "querymate.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["querymate", "evals"]
