@@ -53,6 +53,24 @@ def test_no_widen_when_already_widened_or_no_retrieval_or_other_error():
     assert not should_widen("syntax", widened=False, use_retrieval=True)
 
 
+from querymate.settings import call_cost  # noqa: E402
+
+
+def test_call_cost_sonnet():
+    # 1M in @ $3 + 1M out @ $15
+    assert abs(call_cost("claude-sonnet-4-6", 1_000_000, 1_000_000, 0, 0) - 18.0) < 1e-9
+
+
+def test_call_cost_cache_rates():
+    # cache read 0.1x input rate; cache write 1.25x input rate (Haiku: $1/MTok in)
+    c = call_cost("claude-haiku-4-5", 0, 0, 1_000_000, 1_000_000)
+    assert abs(c - (0.1 + 1.25)) < 1e-9
+
+
+def test_call_cost_unknown_model_is_zero():
+    assert call_cost("not-a-model", 1000, 1000, 0, 0) == 0.0
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

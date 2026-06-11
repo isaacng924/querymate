@@ -8,9 +8,11 @@ by the caller (routed per ``settings``).
 from __future__ import annotations
 
 import json
+import time
 from typing import Optional
 
 import anthropic
+from .settings import call_cost
 
 _client: Optional[anthropic.Anthropic] = None
 
@@ -20,6 +22,23 @@ def client() -> anthropic.Anthropic:
     if _client is None:
         _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
     return _client
+
+
+def _usage_entry(resp, model: str, t0: float, *, purpose: str) -> dict:
+    u = resp.usage
+    cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
+    cache_write = getattr(u, "cache_creation_input_tokens", 0) or 0
+    return {
+        "purpose": purpose,                    # writer | critic | planner
+        "model": model,
+        "input_tokens": u.input_tokens,
+        "output_tokens": u.output_tokens,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": cache_write,
+        "cost_usd": call_cost(model, u.input_tokens, u.output_tokens,
+                              cache_read, cache_write),
+        "latency_s": round(time.monotonic() - t0, 3),
+    }
 
 
 _SQL_FORMAT = {
@@ -58,10 +77,11 @@ def write_sql(
     schema: str,
     dialect: str,
     model: str,
+    evidence: Optional[str] = None,
     repair_hint: Optional[str] = None,
     prev_sql: Optional[str] = None,
     max_tokens: int = 1500,
-) -> str:
+) -> tuple[str, dict]:
     # cache_control on the schema/system prefix: stable across the writer/critic
     # calls for a question (and across questions on the same DB).
     system = [
@@ -72,11 +92,14 @@ def write_sql(
         }
     ]
     parts = [f"Question: {question}"]
+    if evidence:
+        parts.append(f"Hint (domain evidence): {evidence}")
     if prev_sql:
         parts.append(f"\nYour previous query was:\n{prev_sql}")
     if repair_hint:
         parts.append(f"\nIt failed. Fix it. Diagnosis:\n{repair_hint}")
 
+    t0 = time.monotonic()
     resp = client().messages.create(
         model=model,
         max_tokens=max_tokens,
@@ -85,11 +108,12 @@ def write_sql(
         messages=[{"role": "user", "content": "\n".join(parts)}],
         output_config={"format": _SQL_FORMAT},
     )
+    entry = _usage_entry(resp, model, t0, purpose="writer")
     text = next((b.text for b in resp.content if b.type == "text"), "{}")
     try:
-        return json.loads(text)["sql"].strip()
+        return json.loads(text)["sql"].strip(), entry
     except Exception:
-        return text.strip()
+        return text.strip(), entry
 
 
 def diagnose(
@@ -101,9 +125,10 @@ def diagnose(
     error: str,
     model: str,
     max_tokens: int = 400,
-) -> str:
+) -> tuple[str, dict]:
     """Richer critic (optional). The Phase-0 default feeds the raw DB error back
     as the hint; set ``use_llm_critic`` to call this for a real diagnosis."""
+    t0 = time.monotonic()
     resp = client().messages.create(
         model=model,
         max_tokens=max_tokens,
@@ -126,4 +151,5 @@ def diagnose(
             }
         ],
     )
-    return next((b.text for b in resp.content if b.type == "text"), error)
+    entry = _usage_entry(resp, model, t0, purpose="critic")
+    return next((b.text for b in resp.content if b.type == "text"), error), entry
