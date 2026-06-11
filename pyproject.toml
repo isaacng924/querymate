@@ -8,11 +8,15 @@ dependencies = [
     "langgraph>=0.2.50",
     "sqlglot>=25.0",
     "pydantic-settings>=2.0",
+    "sqlite-vec>=0.1.6",
+    "fastembed>=0.5",
 ]
 
 [project.optional-dependencies]
 # Phase 3 observability. Install with: uv sync --extra trace
 trace = ["langfuse>=2.0"]
+# Eval chart + BIRD download helpers. Install with: uv sync --extra eval
+eval = ["matplotlib>=3.9"]
 
 [project.scripts]
 querymate = "querymate.cli:main"

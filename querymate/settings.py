@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     # if you'd rather pay for max quality everywhere.
     writer_model: str = "claude-sonnet-4-6"
     escalate_model: str = "claude-opus-4-8"  # used on the last allowed attempt
+    fast_model: str = "claude-haiku-4-5"      # simple lookups (router tier 1)
+    planner_model: str = "claude-haiku-4-5"   # advisory plan call
+
+    # --- Retrieval (Phase 1) ---------------------------------------------
+    retrieval_k: int = 5            # top-k schema cards per question
+    schema_index_path: str = "data/schema_index.sqlite"
 
     # --- Critic loop -------------------------------------------------------
     max_attempts: int = 3  # repair attempts after the first write
@@ -34,5 +40,13 @@ class Settings(BaseSettings):
     # --- Observability (Phase 3) ------------------------------------------
     langfuse_enabled: bool = False  # no-op until wired in querymate/trace.py
 
+
+# USD per MTok (input, output). Cache reads are billed at 0.1x input; cache
+# writes at 1.25x input. Update when Anthropic prices change.
+PRICES: dict[str, tuple[float, float]] = {
+    "claude-haiku-4-5": (1.0, 5.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-opus-4-8": (15.0, 75.0),
+}
 
 settings = Settings()
