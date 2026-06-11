@@ -103,7 +103,7 @@ red-team suite, and a pgvector retriever backend.
 querymate/   validator · executor · llm · nodes · graph · cli · settings · state · trace · embedder · schema_cards · card_index · retriever · router
 evals/       compare (EX) · recall · run_bird (harness) · run_recall · make_subset · make_chart · data/
 scripts/     make_demo_db.py · ingest_schemas.py · fetch_bird.py
-tests/       test_validator · test_executor · test_compare   (plain-assert)
+tests/       validator · executor · compare · schema_cards · retriever · router · recall · graph   (plain-assert)
 ```
 
 ## Troubleshooting
