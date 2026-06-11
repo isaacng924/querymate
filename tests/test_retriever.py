@@ -72,6 +72,31 @@ def test_index_get_cards_by_table():
         idx.close()
 
 
+from querymate.retriever import Retriever  # noqa: E402
+
+
+def test_retrieve_expands_fk_neighbors():
+    with tempfile.TemporaryDirectory() as d:
+        idx = _build_index(os.path.join(d, "ix.sqlite"))
+        r = Retriever(idx)
+        # 'orders' is the closest card; its FK neighbour 'customers' must ride along.
+        cards, schema = r.retrieve("orders by order date and customer", db_id="shop", k=1)
+        tables = [c.table for c in cards]
+        assert "orders" in tables and "customers" in tables
+        assert "Table: orders" in schema and "Table: customers" in schema
+        idx.close()
+
+
+def test_retrieve_no_duplicate_cards():
+    with tempfile.TemporaryDirectory() as d:
+        idx = _build_index(os.path.join(d, "ix.sqlite"))
+        r = Retriever(idx)
+        cards, _ = r.retrieve("customers and their orders", db_id="shop", k=3)
+        tables = [c.table for c in cards]
+        assert len(tables) == len(set(tables))
+        idx.close()
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
