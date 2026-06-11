@@ -5,3 +5,5 @@ __pycache__/
 data/*.sqlite
 evals/report.json
 .DS_Store
+evals/report*.json
+evals/recall_report.json
