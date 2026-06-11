@@ -35,6 +35,43 @@ def test_fake_embedder_similarity_signal():
     assert cos(q, near) > cos(q, far)
 
 
+import tempfile  # noqa: E402
+
+from querymate.card_index import CardIndex  # noqa: E402
+from querymate.schema_cards import SchemaCard  # noqa: E402
+
+_CARDS = [
+    SchemaCard("shop", "customers", "Table: customers\ncolumns id name country", []),
+    SchemaCard("shop", "products", "Table: products\ncolumns id price category", []),
+    SchemaCard("shop", "orders",
+               "Table: orders\ncolumns id customer_id order_date", ["customers"]),
+    SchemaCard("other", "customers", "Table: customers\ncolumns id name country", []),
+]
+
+
+def _build_index(path: str) -> CardIndex:
+    idx = CardIndex(path, embedder=FakeEmbedder())
+    idx.add_cards(_CARDS)
+    return idx
+
+
+def test_index_roundtrip_and_db_filter():
+    with tempfile.TemporaryDirectory() as d:
+        idx = _build_index(os.path.join(d, "ix.sqlite"))
+        hits = idx.query("customers name country", db_id="shop", k=2)
+        assert [h.table for h in hits][0] == "customers"
+        assert all(h.db_id == "shop" for h in hits)
+        idx.close()
+
+
+def test_index_get_cards_by_table():
+    with tempfile.TemporaryDirectory() as d:
+        idx = _build_index(os.path.join(d, "ix.sqlite"))
+        got = idx.get_cards("shop", ["orders", "customers"])
+        assert sorted(c.table for c in got) == ["customers", "orders"]
+        idx.close()
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
