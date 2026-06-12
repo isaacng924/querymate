@@ -85,6 +85,14 @@ def main() -> None:
     ap.add_argument("--update-baseline", action="store_true")
     args = ap.parse_args()
 
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise SystemExit(
+            "ANTHROPIC_API_KEY is not set — the golden runner makes live LLM "
+            "calls (writer/planner per question). Set it in .env or the env."
+        )
     if args.gate and args.update_baseline:
         raise SystemExit(
             "--gate with --update-baseline would compare the run against the "

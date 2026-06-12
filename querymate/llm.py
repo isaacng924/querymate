@@ -20,6 +20,9 @@ _client: Optional[anthropic.Anthropic] = None
 def client() -> anthropic.Anthropic:
     global _client
     if _client is None:
+        from dotenv import load_dotenv  # ships with pydantic-settings
+
+        load_dotenv()  # pick up ANTHROPIC_API_KEY from .env, as the README promises
         _client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
     return _client
 
@@ -29,7 +32,7 @@ def _usage_entry(resp, model: str, t0: float, *, purpose: str) -> dict:
     cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
     cache_write = getattr(u, "cache_creation_input_tokens", 0) or 0
     return {
-        "purpose": purpose,                    # writer | critic | planner
+        "purpose": purpose,                    # writer | critic | planner | explainer | judge
         "model": model,
         "input_tokens": u.input_tokens,
         "output_tokens": u.output_tokens,
