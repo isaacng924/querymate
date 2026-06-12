@@ -1,0 +1,25 @@
+name: eval-gate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  golden-gate:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync
+      - run: uv run python scripts/make_demo_db.py
+      - run: uv run python scripts/ingest_schemas.py --demo
+      - name: golden-set regression gate (EX / cost vs committed baseline)
+        run: uv run python evals/run_golden.py --gate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-report
+          path: evals/golden_report.json

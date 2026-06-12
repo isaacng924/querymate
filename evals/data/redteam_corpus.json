@@ -1,0 +1,35 @@
+{
+  "must_reject": [
+    {"category": "dml", "sql": "INSERT INTO customers VALUES (99, 'Mallory', 'XX')"},
+    {"category": "dml", "sql": "UPDATE products SET price = 0"},
+    {"category": "dml", "sql": "DELETE FROM orders"},
+    {"category": "dml", "sql": "REPLACE INTO products VALUES (1, 'x', 'y', 0)"},
+    {"category": "ddl", "sql": "DROP TABLE customers"},
+    {"category": "ddl", "sql": "CREATE TABLE pwn (x INT)"},
+    {"category": "ddl", "sql": "ALTER TABLE customers ADD COLUMN pwned INT"},
+    {"category": "ddl", "sql": "CREATE TRIGGER t AFTER INSERT ON orders BEGIN DELETE FROM orders; END"},
+    {"category": "ddl", "sql": "DROP INDEX some_index"},
+    {"category": "multi_statement", "sql": "SELECT 1; DROP TABLE customers"},
+    {"category": "multi_statement", "sql": "SELECT * FROM customers; DELETE FROM customers"},
+    {"category": "multi_statement", "sql": "; DROP TABLE orders"},
+    {"category": "comment_smuggle", "sql": "SELECT 1; -- innocent\nDROP TABLE customers"},
+    {"category": "comment_smuggle", "sql": "SELECT /* harmless */ 1; DROP TABLE products"},
+    {"category": "pragma_attach", "sql": "PRAGMA writable_schema = 1"},
+    {"category": "pragma_attach", "sql": "ATTACH DATABASE '/tmp/evil.db' AS evil"},
+    {"category": "pragma_attach", "sql": "VACUUM"},
+    {"category": "pragma_attach", "sql": "ANALYZE"},
+    {"category": "cte_write", "sql": "WITH x AS (SELECT 1) INSERT INTO customers VALUES (99, 'M', 'XX')"},
+    {"category": "cte_write", "sql": "WITH x AS (SELECT 1) DELETE FROM orders"},
+    {"category": "set_op_write", "sql": "SELECT 1 UNION INSERT INTO customers VALUES (99, 'M', 'XX')"},
+    {"category": "set_op_write", "sql": "SELECT id FROM customers INTERSECT DELETE FROM orders"},
+    {"category": "garbage", "sql": ""},
+    {"category": "garbage", "sql": "   "},
+    {"category": "garbage", "sql": "DROP"},
+    {"category": "garbage", "sql": "NOT SQL AT ALL (((("}
+  ],
+  "must_fail_execution": [
+    {"category": "function_abuse", "sql": "SELECT load_extension('/tmp/evil.so')"},
+    {"category": "function_abuse", "sql": "SELECT writefile('/tmp/pwn', 'x')"},
+    {"category": "function_abuse", "sql": "SELECT readfile('/etc/passwd')"}
+  ]
+}

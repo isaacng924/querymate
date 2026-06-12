@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync
+      - run: uv run python scripts/make_demo_db.py
+      - name: plain-assert suites (free tier — no LLM, no model download)
+        run: |
+          set -e
+          for t in tests/test_*.py; do uv run python "$t"; done

@@ -59,11 +59,13 @@ def run_question(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="QueryMate — NL→SQL copilot (Phase 1)")
+    ap = argparse.ArgumentParser(description="QueryMate — NL→SQL copilot (Phase 2)")
     ap.add_argument("question", help="a question in plain English")
     ap.add_argument("--db", default=None, help="path to a SQLite DB (default: demo)")
     ap.add_argument("--no-rag", action="store_true",
                     help="skip retrieval; prompt with the full schema")
+    ap.add_argument("--no-explain", action="store_true",
+                    help="skip the natural-language answer line")
     args = ap.parse_args()
 
     out = run_question(args.question, db_path=args.db,
@@ -82,8 +84,22 @@ def main() -> None:
     print("\nResult: " + (" | ".join(cols) if cols else "(no columns)"))
     for r in rows[:50]:
         print("  " + " | ".join(str(c) for c in r))
-    cost = sum(e.get("cost_usd", 0.0) for e in out.get("cost_log", []))
-    models = [e["model"].rsplit("-", 1)[0] for e in out.get("cost_log", [])
+
+    cost_entries = list(out.get("cost_log", []))
+    if not args.no_explain:
+        from . import llm
+
+        answer, entry = llm.explain(
+            question=args.question, columns=cols, rows=rows,
+            model=settings.fast_model,
+        )
+        if entry:
+            cost_entries.append(entry)
+        if answer:
+            print(f"\nAnswer: {answer}")
+
+    cost = sum(e.get("cost_usd", 0.0) for e in cost_entries)
+    models = [e["model"].rsplit("-", 1)[0] for e in cost_entries
               if e.get("purpose") == "writer"]
     print(
         f"\n({len(rows)} row(s); repair attempts={out.get('attempts', 0)}; "
