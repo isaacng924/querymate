@@ -85,6 +85,11 @@ def main() -> None:
     ap.add_argument("--update-baseline", action="store_true")
     args = ap.parse_args()
 
+    if args.gate and args.update_baseline:
+        raise SystemExit(
+            "--gate with --update-baseline would compare the run against the "
+            "baseline it just wrote (always passes) — run them separately."
+        )
     if not os.path.exists(args.index):
         raise SystemExit(
             f"schema index '{args.index}' missing — build it first:\n"
