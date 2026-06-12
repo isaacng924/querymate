@@ -1,11 +1,16 @@
-# QueryMate — NL→SQL analytics copilot (Phase 1)
+# QueryMate — NL→SQL analytics copilot (Phase 2)
+
+[![ci](https://github.com/isaacng924/querymate/actions/workflows/ci.yml/badge.svg)](https://github.com/isaacng924/querymate/actions/workflows/ci.yml)
 
 Plain-English question → schema-grounded SQL → sandboxed execution → a
-self-correcting critic loop → answer. This repo is at **Phase 1** of the build spec: schema-card RAG (sqlite-vec +
-fastembed, fully local), an advisory planner, Haiku/Sonnet/Opus model routing
-with per-call cost accounting, retrieval-aware repair, and an eval that reports
-execution accuracy by difficulty bucket plus schema-retrieval recall@k.
-Clarifier, explainer, LLMOps dashboards, and the CI gate come in later phases.
+self-correcting critic loop → answer. This repo is at **Phase 2** of the build spec: everything from Phase 1
+(schema-card RAG, advisory planner, model routing with cost accounting,
+retrieval-aware repair, bucketed BIRD eval) plus an enforced eval harness — a
+red-team safety suite and golden-set integrity checks gating every PR for
+free, an answer narration with an LLM-as-judge faithfulness metric, and an
+on-demand regression gate that blocks on EX or cost regressions against a
+committed baseline. Langfuse dashboards, the chat UI, and the clarifier come
+in later phases.
 
 > The differentiator isn't "an LLM writes SQL" — it's the **eval harness**:
 > execution accuracy on a public benchmark (BIRD/Spider), a measurable
@@ -63,6 +68,9 @@ for t in tests/test_*.py; do uv run python "$t"; done
 uv run querymate "Which customer has placed the most orders? Return their name."
 ```
 
+The CLI ends with an `Answer:` line — a 1–2 sentence narration of the result
+rows (skip with `--no-explain`).
+
 ## Run the execution-accuracy eval (needs ANTHROPIC_API_KEY)
 
 ````bash
@@ -84,6 +92,26 @@ Reports land in `evals/report_<arm>.json` (EX by difficulty bucket,
 self-correction lift, cost/question by routing tier) and
 `evals/recall_report.json`; the chart in `evals/ex_chart.png`.
 
+## Safety & regression gate
+
+Tier 1 runs free on every push (`.github/workflows/ci.yml`): all plain-assert
+suites including the **red-team corpus** (`evals/data/redteam_corpus.json` —
+DML/DDL, stacked statements, comment smuggling, CTE-wrapped writes, PRAGMA/
+ATTACH, `load_extension` abuse) at a required **100% block rate**, plus golden-
+set integrity and gate-threshold unit tests.
+
+Tier 2 is the paid gate — manual trigger only (`eval-gate` workflow, or locally):
+
+```bash
+uv run python evals/run_golden.py                    # 40-question golden set: EX + faithfulness + cost
+uv run python evals/run_golden.py --update-baseline  # refresh evals/baseline.json (commit it)
+uv run python evals/run_golden.py --gate             # exit 1 if EX drops >2pp or cost/question rises >15%
+```
+
+The judge (`querymate/llm.py:judge_faithfulness`) scores whether the answer
+narration only states what the rows support; faithfulness is reported per run
+but only EX and cost gate the merge — safety gates at 100% in tier 1.
+
 ## Model routing
 
 Per the build spec, QueryMate routes models for cost (`querymate/settings.py`):
@@ -93,17 +121,15 @@ the final attempt. Set `QUERYMATE_WRITER_MODEL=claude-opus-4-8` (and
 
 ## What's deliberately *not* here yet
 
-Phase 2+ (see the vault build spec): an explainer with a faithfulness judge,
-Langfuse tracing (`querymate/trace.py` is the seam), a CI regression gate, a
-red-team suite, and a pgvector retriever backend.
+Langfuse tracing (`querymate/trace.py` is the seam), the chat UI + clarifier, and a pgvector retriever backend.
 
 ## Layout
 
 ```
 querymate/   validator · executor · llm · nodes · graph · cli · settings · state · trace · embedder · schema_cards · card_index · retriever · router
-evals/       compare (EX) · recall · run_bird (harness) · run_recall · make_subset · make_chart · data/
+evals/       compare (EX) · recall · run_bird (harness) · run_recall · make_subset · make_chart · run_golden · data/ (golden_set, redteam_corpus)
 scripts/     make_demo_db.py · ingest_schemas.py · fetch_bird.py
-tests/       validator · executor · compare · schema_cards · retriever · router · recall · graph   (plain-assert)
+tests/       validator · executor · compare · schema_cards · retriever · router · recall · graph · redteam · golden_set · gate   (plain-assert)
 ```
 
 ## Troubleshooting

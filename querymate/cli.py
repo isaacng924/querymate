@@ -59,7 +59,7 @@ def run_question(
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="QueryMate — NL→SQL copilot (Phase 1)")
+    ap = argparse.ArgumentParser(description="QueryMate — NL→SQL copilot (Phase 2)")
     ap.add_argument("question", help="a question in plain English")
     ap.add_argument("--db", default=None, help="path to a SQLite DB (default: demo)")
     ap.add_argument("--no-rag", action="store_true",
