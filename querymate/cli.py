@@ -99,8 +99,7 @@ def main() -> None:
             print(f"\nAnswer: {answer}")
 
     cost = sum(e.get("cost_usd", 0.0) for e in cost_entries)
-    models = [e["model"].rsplit("-", 1)[0] for e in cost_entries
-              if e.get("purpose") == "writer"]
+    models = [e["model"] for e in cost_entries if e.get("purpose") == "writer"]
     print(
         f"\n({len(rows)} row(s); repair attempts={out.get('attempts', 0)}; "
         f"writer={models[-1] if models else '-'}; cost=${cost:.4f})"
