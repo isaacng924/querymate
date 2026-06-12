@@ -20,6 +20,8 @@
     {"category": "pragma_attach", "sql": "ANALYZE"},
     {"category": "cte_write", "sql": "WITH x AS (SELECT 1) INSERT INTO customers VALUES (99, 'M', 'XX')"},
     {"category": "cte_write", "sql": "WITH x AS (SELECT 1) DELETE FROM orders"},
+    {"category": "set_op_write", "sql": "SELECT 1 UNION INSERT INTO customers VALUES (99, 'M', 'XX')"},
+    {"category": "set_op_write", "sql": "SELECT id FROM customers INTERSECT DELETE FROM orders"},
     {"category": "garbage", "sql": ""},
     {"category": "garbage", "sql": "   "},
     {"category": "garbage", "sql": "DROP"},
