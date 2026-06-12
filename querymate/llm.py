@@ -75,6 +75,24 @@ _PLAN_FORMAT = {
     },
 }
 
+_JUDGE_FORMAT = {
+    "type": "json_schema",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "faithful": {
+                "type": "boolean",
+                "description": "True only if EVERY claim in the answer is "
+                               "directly supported by the provided rows.",
+            },
+            "reason": {"type": "string",
+                       "description": "One sentence justifying the verdict."},
+        },
+        "required": ["faithful", "reason"],
+        "additionalProperties": False,
+    },
+}
+
 
 def _system(schema: str, dialect: str) -> str:
     return (
@@ -214,5 +232,90 @@ def plan(
         if not isinstance(info, dict) or "tables" not in info:
             return None, entry
         return info, entry
+    except Exception:
+        return None, None
+
+
+def explain(
+    *,
+    question: str,
+    columns: list[str],
+    rows: list,
+    model: str,
+    max_tokens: int = 300,
+) -> tuple[Optional[str], Optional[dict]]:
+    """1-2 sentence answer narration over the result rows. Advisory — returns
+    (None, None) on any failure; the caller never depends on it."""
+    sample = rows[:20]
+    t0 = time.monotonic()
+    try:
+        resp = client().messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=[{
+                "type": "text",
+                "text": (
+                    "You summarise SQL query results. Answer the user's question "
+                    "in 1-2 sentences using ONLY the rows provided. State numbers "
+                    "exactly as they appear. If the rows don't answer the "
+                    "question, say so."
+                ),
+            }],
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Question: {question}\nColumns: {columns}\n"
+                    f"Rows (first {len(sample)} of {len(rows)}): {sample}"
+                ),
+            }],
+        )
+        entry = _usage_entry(resp, model, t0, purpose="explainer")
+        return next((b.text for b in resp.content if b.type == "text"), None), entry
+    except Exception:
+        return None, None
+
+
+def judge_faithfulness(
+    *,
+    question: str,
+    answer: str,
+    columns: list[str],
+    rows: list,
+    model: str,
+    max_tokens: int = 300,
+) -> tuple[Optional[dict], Optional[dict]]:
+    """LLM-as-judge: does the answer only state what the rows support?
+    Returns ({faithful, reason}, usage_entry); (None, None) on failure."""
+    sample = rows[:20]
+    t0 = time.monotonic()
+    try:
+        resp = client().messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=[{
+                "type": "text",
+                "text": (
+                    "You are a strict faithfulness judge. Given a question, the "
+                    "result rows, and an answer, decide whether every claim in "
+                    "the answer is supported by the rows. Unsupported numbers, "
+                    "invented entities, or over-claims mean NOT faithful."
+                ),
+            }],
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Question: {question}\nColumns: {columns}\n"
+                    f"Rows (first {len(sample)} of {len(rows)}): {sample}\n"
+                    f"Answer to judge: {answer}"
+                ),
+            }],
+            output_config={"format": _JUDGE_FORMAT},
+        )
+        entry = _usage_entry(resp, model, t0, purpose="judge")
+        text = next((b.text for b in resp.content if b.type == "text"), "{}")
+        verdict = json.loads(text)
+        if not isinstance(verdict, dict) or "faithful" not in verdict:
+            return None, entry
+        return verdict, entry
     except Exception:
         return None, None
